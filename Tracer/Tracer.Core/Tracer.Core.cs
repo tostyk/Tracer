@@ -1,6 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Threading;
 
 namespace Tracer.Core
 {
@@ -130,7 +131,7 @@ namespace Tracer.Core
                 }
             }
         }
-        private ReadWriteTreeNode CloseNode(ReadWriteTreeNode treeNode)
+        private bool CloseNode(ReadWriteTreeNode treeNode)
         {
             bool findCurrentNode = false;
             foreach (ReadWriteTreeNode node in treeNode.MethodQueue)
@@ -140,17 +141,17 @@ namespace Tracer.Core
                     node.isCurrentNode = false;
                     treeNode.isCurrentNode = true;
                     findCurrentNode = true;
-                    return node;
+                    return true;
                 }
             }
             if (!findCurrentNode)
             {
                 foreach (ReadWriteTreeNode node in treeNode.MethodQueue)
                 {
-                    CloseNode(node);
+                    if (CloseNode(node)) return true;
                 }
             }
-            return treeNode;
+            return false;
         }
         private ReadOnlyCollection<MethodTrace> ConvertToReadOnly(ConcurrentQueue<ReadWriteMethodTrace> methodList)
         {
@@ -221,16 +222,17 @@ namespace Tracer.Core
             while (!traceResult.ThreadDictionary[threadId].MethodStack.TryPop(out methodInfo)) { }
             methodInfo.stopwatch.Stop();
             methodInfo.Method.Time = methodInfo.stopwatch.ElapsedMilliseconds;
-            if (CloseNode(traceResult.ThreadDictionary[threadId]) is ReadWriteThreadTrace)
-            {
-                foreach (ReadWriteMethodTrace readWriteMethodTrace in traceResult.ThreadDictionary[threadId].MethodQueue)
-                {
-                    traceResult.ThreadDictionary[threadId].Time += readWriteMethodTrace.Time;
-                }
-            }
+            CloseNode(traceResult.ThreadDictionary[threadId]);
         }
         public TraceResult GetTraceResult()
         {
+            foreach (KeyValuePair<int, ReadWriteThreadTrace> keyValuePair in traceResult.ThreadDictionary)
+            {
+                foreach (ReadWriteMethodTrace readWriteMethodTrace in keyValuePair.Value.MethodQueue)
+                {
+                    keyValuePair.Value.Time += readWriteMethodTrace.Time;
+                }
+            }
             TraceResult TraceResult = new TraceResult(ConvertToReadOnly(traceResult.ThreadDictionary));
             return TraceResult;
         }

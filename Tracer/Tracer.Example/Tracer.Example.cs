@@ -31,8 +31,8 @@ namespace Tracer.Example
 
         public void Recursion()
         {
-            Thread.Sleep(50);
             _tracer.StartTrace();
+            Thread.Sleep(50);
             recursionCount--;
             if (recursionCount > 0)
             {
@@ -44,12 +44,10 @@ namespace Tracer.Example
     public class Bar
     {
         private ITracer _tracer;
-
         internal Bar(ITracer tracer)
         {
             _tracer = tracer;
         }
-
         public void InnerMethod1()
         {
             _tracer.StartTrace();
