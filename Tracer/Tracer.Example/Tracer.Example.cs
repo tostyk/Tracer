@@ -6,7 +6,6 @@ namespace Tracer.Example
     {
         private Bar _bar;
         private ITracer _tracer;
-        private int recursionCount = 3;
 
         internal Foo(ITracer tracer)
         {
@@ -28,15 +27,18 @@ namespace Tracer.Example
             _bar.InnerMethod2();
             _tracer.StopTrace();
         }
-
-        public void Recursion()
+        public void StartRecursion(int count)
+        {
+            Recursion(count);
+        }
+        public void Recursion(int count)
         {
             _tracer.StartTrace();
             Thread.Sleep(50);
-            recursionCount--;
-            if (recursionCount > 0)
+            count--;
+            if (count > 0)
             {
-                Recursion();
+                Recursion(count);
             }
             _tracer.StopTrace();
         }
@@ -67,10 +69,32 @@ namespace Tracer.Example
         {
             Core.Tracer tracer = new Core.Tracer();
             Foo foo = new Foo(tracer);
+
+            void ThreadMethod() => 
+                foo.MyMethod2(); 
+                foo.Recursion(3);
+
+            Thread myThread = new Thread(ThreadMethod);
+            myThread.Start();
             foo.MyMethod1();
             foo.MyMethod2();
-            foo.Recursion();
+            foo.Recursion(2);
             TraceResult traceResult = tracer.GetTraceResult();
+
+            XmlTracerSerializer xmlTracerSerializer = new XmlTracerSerializer();
+            JsonTracerSerializer jsonTracerSerializer = new JsonTracerSerializer();
+
+            string xml = xmlTracerSerializer.Serialize(traceResult);
+            string json = jsonTracerSerializer.Serialize(traceResult);
+
+            ConsoleWriter consoleWriter = new ConsoleWriter();
+            consoleWriter.Write(xml);
+            consoleWriter.Write(json);
+
+            FileWriter xmlFileWriter = new FileWriter("file.xml.txt");
+            xmlFileWriter.Write(xml);
+            FileWriter jsonFileWriter = new FileWriter("file.json.txt");
+            jsonFileWriter.Write(json);
         }
     }
 }
