@@ -82,18 +82,18 @@ namespace Tracer.Example
         {
             ThreadList = new List<SerializableThreadTrace>();
         }
-        internal static List<SerializableMethodTrace> ConvertToSerializable(ReadOnlyCollection<MethodTrace> methodsTrace)
+        public static List<SerializableMethodTrace> ConvertToSerializable(ReadOnlyCollection<MethodTrace> methodsTrace)
         {
             List<SerializableMethodTrace> serializableMethodTraces = new List<SerializableMethodTrace>();
             foreach (MethodTrace methodTrace in methodsTrace)
             {
-                if (methodTrace.MethodList.Count > 0)
+                if (methodTrace.Methods.Count > 0)
                 {
                     serializableMethodTraces.Add(new SerializableMethodTrace(
                         methodTrace.MethodName,
                         methodTrace.ClassName,
                         methodTrace.Time,
-                        ConvertToSerializable(methodTrace.MethodList)));
+                        ConvertToSerializable(methodTrace.Methods)));
                 }
                 else
                 {
@@ -106,16 +106,16 @@ namespace Tracer.Example
             }
             return serializableMethodTraces;
         }
-        internal static SerializableTraceResult ConvertToSerializable(TraceResult traceResult)
+        public static SerializableTraceResult ConvertToSerializable(TraceResult traceResult)
         {
             SerializableTraceResult serializableTraceResult = new SerializableTraceResult();
-            foreach (KeyValuePair<int, ThreadTrace> threadTrace in traceResult.ThreadDictionary)
+            foreach (KeyValuePair<int, ThreadTrace> threadTrace in traceResult.Threads)
             {
                 serializableTraceResult.ThreadList.Add(
                     new SerializableThreadTrace(
                         threadTrace.Key,
                         threadTrace.Value.Time,
-                        ConvertToSerializable(threadTrace.Value.MethodList)));
+                        ConvertToSerializable(threadTrace.Value.Methods)));
             }
             return serializableTraceResult;
         }

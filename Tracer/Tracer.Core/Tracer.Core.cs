@@ -1,13 +1,12 @@
 ﻿using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
-using System.Threading;
 
 namespace Tracer.Core
 {
     internal abstract class ReadWriteTreeNode
     {
-        public bool isCurrentNode = true;
+        public bool IsCurrentNode = true;
         public ConcurrentQueue<ReadWriteMethodTrace> MethodQueue = new();
     }
     internal class ReadWriteMethodTrace : ReadWriteTreeNode
@@ -35,11 +34,11 @@ namespace Tracer.Core
         public class MethodInfo
         {
             public ReadWriteMethodTrace Method;
-            public Stopwatch stopwatch;
+            public Stopwatch Stopwatch;
             public MethodInfo(ReadWriteMethodTrace method)
             {
                 Method = method;
-                stopwatch = new Stopwatch();
+                Stopwatch = new Stopwatch();
             }
         }
     }
@@ -57,71 +56,68 @@ namespace Tracer.Core
         public string MethodName { get; private set; }
         public string ClassName { get; private set; }
         public long Time { get; private set; }
-        public ReadOnlyCollection<MethodTrace> MethodList { get; protected set; }
+        public ReadOnlyCollection<MethodTrace> Methods { get; protected set; }
         public MethodTrace(
             string methodName,
             string className,
             long time,
-            ReadOnlyCollection<MethodTrace> methodList)
+            ReadOnlyCollection<MethodTrace> methods)
         {
             MethodName = methodName;
             ClassName = className;
             Time = time;
-            MethodList = methodList;
+            Methods = methods;
         }
     }
     public class ThreadTrace
     {
         public long Time { get; private set; }
-        public ReadOnlyCollection<MethodTrace> MethodList { get; private set; }
-        public ThreadTrace(long time, ReadOnlyCollection<MethodTrace> methodList)
+        public ReadOnlyCollection<MethodTrace> Methods { get; private set; }
+        public ThreadTrace(long time, ReadOnlyCollection<MethodTrace> methods)
         {
             Time = time;
-            MethodList = methodList;
+            Methods = methods;
         }
     }
     public class TraceResult
     {
-        public ReadOnlyDictionary<int, ThreadTrace> ThreadDictionary { get; }
+        public ReadOnlyDictionary<int, ThreadTrace> Threads { get; }
         public TraceResult(ReadOnlyDictionary<int, ThreadTrace> threadDictionary)
         {
-            ThreadDictionary = threadDictionary;
+            Threads = threadDictionary;
         }
     }
 
     public interface ITracer
     {
-        // вызывается в начале замеряемого метода
         void StartTrace();
-        // вызывается в конце замеряемого метода
         void StopTrace();
-        // получить результаты измерений
         TraceResult GetTraceResult();
     }
 
     public class Tracer : ITracer
     {
-        ReadWriteTraceResult traceResult;
+        ReadWriteTraceResult _traceResult;
         public Tracer()
         {
-            traceResult = new ReadWriteTraceResult();
+            _traceResult = new ReadWriteTraceResult();
         }
         private void AddMethodToThread(int threadId, string methodName, string className)
         {
-            if (!traceResult.ThreadDictionary.ContainsKey(threadId))
+            if (!_traceResult.ThreadDictionary.ContainsKey(threadId))
             {
-                traceResult.ThreadDictionary.TryAdd(threadId, new ReadWriteThreadTrace(threadId));
+                _traceResult.ThreadDictionary.TryAdd(threadId, new ReadWriteThreadTrace(threadId));
             }
-            AddMethod(threadId, methodName, className, traceResult.ThreadDictionary[threadId]);
+            AddMethod(threadId, methodName, className, _traceResult.ThreadDictionary[threadId]);
         }
         private void AddMethod(int threadId, string methodName, string className, ReadWriteTreeNode treeNode)
         {
-            if (treeNode.isCurrentNode)
+            if (treeNode.IsCurrentNode)
             {
                 ReadWriteMethodTrace methodTrace = new ReadWriteMethodTrace(methodName, className);
                 treeNode.MethodQueue.Enqueue(methodTrace);
-                treeNode.isCurrentNode = false;
-                traceResult.ThreadDictionary[threadId].MethodStack.Push(new ReadWriteThreadTrace.MethodInfo(methodTrace));
+                treeNode.IsCurrentNode = false;
+                _traceResult.ThreadDictionary[threadId].MethodStack.Push(new ReadWriteThreadTrace.MethodInfo(methodTrace));
             }
             else
             {
@@ -133,23 +129,18 @@ namespace Tracer.Core
         }
         private bool CloseNode(ReadWriteTreeNode treeNode)
         {
-            bool findCurrentNode = false;
             foreach (ReadWriteTreeNode node in treeNode.MethodQueue)
             {
-                if (node.isCurrentNode)
+                if (node.IsCurrentNode)
                 {
-                    node.isCurrentNode = false;
-                    treeNode.isCurrentNode = true;
-                    findCurrentNode = true;
+                    node.IsCurrentNode = false;
+                    treeNode.IsCurrentNode = true;
                     return true;
                 }
             }
-            if (!findCurrentNode)
+            foreach (ReadWriteTreeNode node in treeNode.MethodQueue)
             {
-                foreach (ReadWriteTreeNode node in treeNode.MethodQueue)
-                {
-                    if (CloseNode(node)) return true;
-                }
+                if (CloseNode(node)) return true;
             }
             return false;
         }
@@ -197,43 +188,43 @@ namespace Tracer.Core
             StackFrame stackFrame;
             string className;
             string methodName;
-            // со стекового фрейма берется второй метод, так как первый - StartTrace
+            // Со стекового фрейма берется второй метод, так как первый - StartTrace
             if (stackTrace.FrameCount > 1)
             {
                 stackFrame = stackTrace.GetFrame(1);
                 className = stackFrame.GetMethod().DeclaringType.Name;
                 methodName = stackFrame.GetMethod().Name;
-                if (className != typeof(Tracer).Name)
+                /*if (className != typeof(Tracer).Name)
                 {
                     Console.WriteLine("class:  " + className);
                     Console.WriteLine("method: " + methodName);
                 }
-                Console.WriteLine('\n');
+                Console.WriteLine('\n'); */
                 AddMethodToThread(threadId, methodName, className);
                 ReadWriteThreadTrace.MethodInfo methodInfo;
-                while (!traceResult.ThreadDictionary[threadId].MethodStack.TryPeek(out methodInfo)) { }
-                methodInfo.stopwatch.Start();
+                while (!_traceResult.ThreadDictionary[threadId].MethodStack.TryPeek(out methodInfo)) { }
+                methodInfo.Stopwatch.Start();
             }
         }
         public void StopTrace()
         {
             int threadId = Thread.CurrentThread.ManagedThreadId;
             ReadWriteThreadTrace.MethodInfo methodInfo;
-            while (!traceResult.ThreadDictionary[threadId].MethodStack.TryPop(out methodInfo)) { }
-            methodInfo.stopwatch.Stop();
-            methodInfo.Method.Time = methodInfo.stopwatch.ElapsedMilliseconds;
-            CloseNode(traceResult.ThreadDictionary[threadId]);
+            while (!_traceResult.ThreadDictionary[threadId].MethodStack.TryPop(out methodInfo)) { }
+            methodInfo.Stopwatch.Stop();
+            methodInfo.Method.Time = methodInfo.Stopwatch.ElapsedMilliseconds;
+            CloseNode(_traceResult.ThreadDictionary[threadId]);
         }
         public TraceResult GetTraceResult()
         {
-            foreach (KeyValuePair<int, ReadWriteThreadTrace> keyValuePair in traceResult.ThreadDictionary)
+            foreach (KeyValuePair<int, ReadWriteThreadTrace> keyValuePair in _traceResult.ThreadDictionary)
             {
                 foreach (ReadWriteMethodTrace readWriteMethodTrace in keyValuePair.Value.MethodQueue)
                 {
                     keyValuePair.Value.Time += readWriteMethodTrace.Time;
                 }
             }
-            TraceResult TraceResult = new TraceResult(ConvertToReadOnly(traceResult.ThreadDictionary));
+            TraceResult TraceResult = new TraceResult(ConvertToReadOnly(_traceResult.ThreadDictionary));
             return TraceResult;
         }
     }

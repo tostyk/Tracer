@@ -13,14 +13,14 @@
     }
     public class FileWriter : IWriter
     {
-        string FileName;
+        private string _fileName;
         public FileWriter(string filename)
         {
-            FileName = filename;
+            _fileName = filename;
         }
         public void Write(string text)
         {
-            File.WriteAllText(FileName, text);
+            File.WriteAllText(_fileName, text);
         }
     }
 }

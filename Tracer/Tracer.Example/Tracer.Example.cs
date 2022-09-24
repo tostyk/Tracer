@@ -27,10 +27,6 @@ namespace Tracer.Example
             _bar.InnerMethod2();
             _tracer.StopTrace();
         }
-        public void StartRecursion(int count)
-        {
-            Recursion(count);
-        }
         public void Recursion(int count)
         {
             _tracer.StartTrace();
@@ -74,11 +70,13 @@ namespace Tracer.Example
                 foo.MyMethod2(); 
                 foo.Recursion(3);
 
-            Thread myThread = new Thread(ThreadMethod);
-            myThread.Start();
+            Thread thread = new Thread(ThreadMethod);
+            thread.Start();
+            thread.Join();
+
             foo.MyMethod1();
             foo.MyMethod2();
-            foo.Recursion(2);
+            foo.Recursion(3);
             TraceResult traceResult = tracer.GetTraceResult();
 
             XmlTracerSerializer xmlTracerSerializer = new XmlTracerSerializer();
@@ -86,9 +84,11 @@ namespace Tracer.Example
 
             string xml = xmlTracerSerializer.Serialize(traceResult);
             string json = jsonTracerSerializer.Serialize(traceResult);
-
+            
             ConsoleWriter consoleWriter = new ConsoleWriter();
+            Console.WriteLine("------- XML format -------\n");
             consoleWriter.Write(xml);
+            Console.WriteLine("\n------- JSON format -------\n");
             consoleWriter.Write(json);
 
             FileWriter xmlFileWriter = new FileWriter("file.xml.txt");
